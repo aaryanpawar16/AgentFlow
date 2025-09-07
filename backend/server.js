@@ -13,6 +13,35 @@ import orchestratorRoutes from "./routes/orchestrator.js";
 dotenv.config();
 const app = express();
 
+// -----------------------------
+// TEMPORARY DEBUG CORS MIDDLEWARE
+// -----------------------------
+// This middleware logs incoming Origin headers and responds to OPTIONS
+// preflight by echoing the incoming origin back in Access-Control-Allow-Origin.
+// USE FOR DEBUGGING ONLY — remove this middleware after you confirm CORS works.
+app.use((req, res, next) => {
+  const incomingOrigin = req.headers.origin || "<no-origin>";
+  console.log(`[CORS-DEBUG] Incoming Origin: ${incomingOrigin} - ${req.method} ${req.originalUrl}`);
+
+  // If it's a preflight request, respond immediately with permissive CORS headers
+  if (req.method === "OPTIONS") {
+    // Echo origin if present, otherwise allow all
+    const originToSend = incomingOrigin !== "<no-origin>" ? incomingOrigin : "*";
+    res.setHeader("Access-Control-Allow-Origin", originToSend);
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS,PUT,PATCH,DELETE,HEAD");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    // Allow credentials for testing (if you use cookies / auth)
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    // Short-circuit with 204 No Content for preflight
+    return res.status(204).end();
+  }
+
+  next();
+});
+// -----------------------------
+// END TEMPORARY DEBUG CORS MIDDLEWARE
+// -----------------------------
+
 // Simple request logger for debugging
 app.use((req, res, next) => {
   console.log("[REQ]", req.method, req.originalUrl);
@@ -20,7 +49,7 @@ app.use((req, res, next) => {
 });
 
 // -----------------------------
-// CORS: allow multiple origins and handle preflight
+// CORS: allow multiple origins and handle preflight (primary middleware)
 // -----------------------------
 // Support either CORS_ORIGINS (CSV) or legacy single CORS_ORIGIN env var
 const originsEnv = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "http://localhost:5173";
