@@ -19,14 +19,41 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware
-const FRONTEND_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
-app.use(
-  cors({
-    origin: FRONTEND_ORIGIN,
-    credentials: true,
-  })
-);
+// -----------------------------
+// CORS: allow multiple origins and handle preflight
+// -----------------------------
+// Support either CORS_ORIGINS (CSV) or legacy single CORS_ORIGIN env var
+const originsEnv = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "http://localhost:5173";
+// e.g. CORS_ORIGINS="http://localhost:5173,https://agent-flow-two.vercel.app"
+const ALLOWED_ORIGINS = originsEnv
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+console.log("[CORS] Allowed origins:", ALLOWED_ORIGINS);
+
+const corsOptions = {
+  origin: (incomingOrigin, callback) => {
+    // allow non-browser clients (curl/postman) that may not send Origin
+    if (!incomingOrigin) {
+      return callback(null, true);
+    }
+    if (ALLOWED_ORIGINS.includes(incomingOrigin)) {
+      return callback(null, true);
+    }
+    console.warn("[CORS] Rejected origin:", incomingOrigin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true, // allow cookies / Authorization header if needed
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+};
+
+// apply CORS globally (must be before routes)
+app.use(cors(corsOptions));
+// ensure preflight requests are handled for all routes
+app.options("*", cors(corsOptions));
+
 app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
